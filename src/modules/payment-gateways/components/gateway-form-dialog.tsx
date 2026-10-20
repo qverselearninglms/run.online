@@ -39,6 +39,7 @@ import type {
 } from "../types"
 import { gatewayFormErrors, parseGatewayError } from "../lib/gateway-errors"
 import { GatewayErrorAlert } from "./gateway-error-alert"
+import { CopyButton } from "./copy-button"
 
 interface GatewayFormDialogProps {
   open: boolean
@@ -486,6 +487,31 @@ export function GatewayFormDialog({
                   )
                 })}
               </fieldset>
+
+              {/* Webhook URL — server-computed from the gateway's own id,
+                  never an editable credential, but shown here (not just on
+                  the display card) so it's visible side-by-side while
+                  entering the matching value on the provider's own
+                  dashboard. */}
+              {isEdit && gateway && (
+                <div className="space-y-1.5">
+                  <Label>Webhook URL</Label>
+                  <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 py-1 pr-1 pl-2.5">
+                    <code className="min-w-0 flex-1 truncate text-xs text-foreground">
+                      {gateway.webhookUrl}
+                    </code>
+                    <CopyButton
+                      value={gateway.webhookUrl}
+                      label={`${gateway.displayName} webhook URL`}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Set on {provider?.name ?? "the provider"}&apos;s own
+                    dashboard — this app only tells you the URL, it can&apos;t
+                    be changed here.
+                  </p>
+                </div>
+              )}
             </>
           )}
         </form>
