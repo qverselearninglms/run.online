@@ -169,6 +169,16 @@ export function useInitiateTuitionPayment() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Cancel a stuck PENDING gateway payment                              */
+/* ------------------------------------------------------------------ */
+
+export function useCancelPendingPayment() {
+  return useMutation({
+    ...admissionMutationOptions.cancelPendingPayment(),
+  })
+}
+
+/* ------------------------------------------------------------------ */
 /*  Verify Tuition Payment                                               */
 /* ------------------------------------------------------------------ */
 

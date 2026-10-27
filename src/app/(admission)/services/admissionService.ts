@@ -473,6 +473,22 @@ export const admissionService = {
     return verifyGatewayPayment(reference)
   },
 
+  /* ---------- Cancel a stuck PENDING gateway payment ---------- */
+  // Real API: POST /fees/payments/:id/cancel (run_api, 2026-10-27) —
+  // re-verifies against the gateway server-side before cancelling, so
+  // this never clears a payment that actually completed. Used by
+  // PendingPaymentPanel once a 409 PAYMENT_IN_PROGRESS is parsed (see
+  // lib/pendingPaymentError.ts) to get the payer out of
+  // initiatePayment()'s in-flight guard without waiting out the window.
+  async cancelPendingPayment(paymentId: number): Promise<{ status: string }> {
+    const { data } = await apiClient.post<{ data: { status: string } }>(
+      `/fees/payments/${paymentId}/cancel`,
+      undefined,
+      AUTH
+    )
+    return data
+  },
+
   /* ---------- Verify a dynamic/custom PAYMENT stage ---------- */
   // Same endpoint as the three verify*Payment() methods above — it was
   // already generic and reference-only (no fee-type-specific variant
@@ -736,6 +752,13 @@ export const admissionMutationOptions = {
     createApiMutationOptions<PaymentInitiationResponse, number>({
       mutationKey: [...admissionKeys.all, "payments", "tuition", "initiate"],
       mutationFn: admissionService.initiateTuitionPayment,
+    }),
+
+  cancelPendingPayment: () =>
+    createApiMutationOptions<{ status: string }, number>({
+      mutationKey: [...admissionKeys.all, "payments", "cancel"],
+      mutationFn: (paymentId) =>
+        admissionService.cancelPendingPayment(paymentId),
     }),
 
   simulateProgramChosen: (getCurrent: CurrentStudentGetter) =>
