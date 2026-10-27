@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { motion } from "framer-motion"
 import {
   Card,
@@ -12,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { FeeInfoCard } from "./FeeInfoCard"
 import { StatusBadgeWidget } from "./StatusBadgeWidget"
+import { PendingPaymentPanel } from "./PendingPaymentPanel"
 import {
   useInitiateAcceptanceFeePayment,
   useDevSimulate,
@@ -19,11 +21,17 @@ import {
 import { BadgeCheck, ExternalLink, CheckCircle, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import type { StepSectionProps } from "../types/admission"
+import {
+  parsePendingPaymentError,
+  type PendingPaymentDetail,
+} from "../lib/pendingPaymentError"
 
 export function AcceptanceFeeSection({ student, fees }: StepSectionProps) {
   const accFee = fees.fees.find((f) => f.slug === "acceptance-fee")
   const initPayment = useInitiateAcceptanceFeePayment()
   const { simulateAccepted } = useDevSimulate()
+  const [pendingPayment, setPendingPayment] =
+    useState<PendingPaymentDetail | null>(null)
 
   const handlePay = async () => {
     try {
@@ -41,6 +49,14 @@ export function AcceptanceFeeSection({ student, fees }: StepSectionProps) {
         )
       }
     } catch (err) {
+      // See ApplicationPaymentSection.tsx's own comment on this — a 409
+      // here used to be a dead-end toast with no way to resume or clear
+      // whatever it was blocking on.
+      const pending = parsePendingPaymentError(err)
+      if (pending) {
+        setPendingPayment(pending)
+        return
+      }
       toast.error(
         err instanceof Error
           ? err.message
@@ -118,25 +134,32 @@ export function AcceptanceFeeSection({ student, fees }: StepSectionProps) {
             </div>
           </motion.div>
 
-          {/* CTA — Initiate acceptance fee payment */}
-          <Button
-            onClick={handlePay}
-            disabled={initPayment.isPending}
-            className="btn-glow w-full gap-2"
-            size="lg"
-          >
-            {initPayment.isPending ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                Processing…
-              </>
-            ) : (
-              <>
-                Pay ₦{accFee?.amount.toLocaleString() ?? "30,000"} Now
-                <ExternalLink className="size-4" />
-              </>
-            )}
-          </Button>
+          {/* CTA — replaced by the in-progress panel once a 409 blocks it */}
+          {pendingPayment ? (
+            <PendingPaymentPanel
+              detail={pendingPayment}
+              onCancelled={() => setPendingPayment(null)}
+            />
+          ) : (
+            <Button
+              onClick={handlePay}
+              disabled={initPayment.isPending}
+              className="btn-glow w-full gap-2"
+              size="lg"
+            >
+              {initPayment.isPending ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Processing…
+                </>
+              ) : (
+                <>
+                  Pay ₦{accFee?.amount.toLocaleString() ?? "30,000"} Now
+                  <ExternalLink className="size-4" />
+                </>
+              )}
+            </Button>
+          )}
 
           {/* Dev toolbar */}
           {process.env.NODE_ENV === "development" && (

@@ -14,10 +14,15 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { FeeInfoCard } from "./FeeInfoCard"
 import { StatusBadgeWidget } from "./StatusBadgeWidget"
+import { PendingPaymentPanel } from "./PendingPaymentPanel"
 import {
   useInitiateTuitionPayment,
   useDevSimulate,
 } from "../hooks/useAdmissionQueries"
+import {
+  parsePendingPaymentError,
+  type PendingPaymentDetail,
+} from "../lib/pendingPaymentError"
 import {
   GraduationCap,
   ExternalLink,
@@ -49,6 +54,8 @@ export function TuitionPaymentSection({ student, fees }: StepSectionProps) {
     isPartiallyPaid ? "full" : "half"
   )
   const [customAmount, setCustomAmount] = useState<string>("")
+  const [pendingPayment, setPendingPayment] =
+    useState<PendingPaymentDetail | null>(null)
 
   const getPaymentAmount = (): number => {
     if (isPartiallyPaid) return remaining // Only option: pay the balance
@@ -90,6 +97,14 @@ export function TuitionPaymentSection({ student, fees }: StepSectionProps) {
         )
       }
     } catch (err) {
+      // See ApplicationPaymentSection.tsx's own comment on this — a 409
+      // here used to be a dead-end toast with no way to resume or clear
+      // whatever it was blocking on.
+      const pending = parsePendingPaymentError(err)
+      if (pending) {
+        setPendingPayment(pending)
+        return
+      }
       toast.error(
         err instanceof Error
           ? err.message
@@ -345,29 +360,39 @@ export function TuitionPaymentSection({ student, fees }: StepSectionProps) {
             </motion.div>
           )}
 
-          {/* CTA */}
-          <Button
-            onClick={handlePay}
-            disabled={
-              initPayment.isPending || (!isPartiallyPaid && !isValidAmount)
-            }
-            className="btn-glow w-full gap-2"
-            size="lg"
-          >
-            {initPayment.isPending ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                Processing…
-              </>
-            ) : (
-              <>
-                {isPartiallyPaid ? "Pay Balance" : "Pay"} ₦
-                {(isPartiallyPaid ? remaining : paymentAmount).toLocaleString()}{" "}
-                Now
-                <ExternalLink className="size-4" />
-              </>
-            )}
-          </Button>
+          {/* CTA — replaced by the in-progress panel once a 409 blocks it */}
+          {pendingPayment ? (
+            <PendingPaymentPanel
+              detail={pendingPayment}
+              onCancelled={() => setPendingPayment(null)}
+            />
+          ) : (
+            <Button
+              onClick={handlePay}
+              disabled={
+                initPayment.isPending || (!isPartiallyPaid && !isValidAmount)
+              }
+              className="btn-glow w-full gap-2"
+              size="lg"
+            >
+              {initPayment.isPending ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Processing…
+                </>
+              ) : (
+                <>
+                  {isPartiallyPaid ? "Pay Balance" : "Pay"} ₦
+                  {(isPartiallyPaid
+                    ? remaining
+                    : paymentAmount
+                  ).toLocaleString()}{" "}
+                  Now
+                  <ExternalLink className="size-4" />
+                </>
+              )}
+            </Button>
+          )}
 
           {/* A partial payment already unlocks real portal access (see
               NavBar.tsx's dashboardHref logic) — give the applicant a direct
